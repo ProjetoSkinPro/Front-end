@@ -103,8 +103,15 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
     }
   };
 
+  // Interface para o objeto de arquivo do React Native
+  interface ReactNativeFile {
+    uri: string;
+    name: string;
+    type: string;
+  }
+
   // Função auxiliar para obter um File/Blob a partir de uma URI
-  const getFileFromImageUri = async (uri: string): Promise<File | Blob | null> => {
+  const getFileFromImageUri = async (uri: string): Promise<File | Blob | ReactNativeFile | null> => {
     try {
       if (!uri) return null;
       
@@ -112,42 +119,34 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
       
-      // Para ambiente web
-      try {
-        // Verifica se fetch está disponível de forma segura
-        const canUseFetch = typeof window !== 'undefined' && 
-                         typeof window.fetch === 'function';
-        
-        if (canUseFetch) {
-          const response = await fetch(uri);
-          if (!response.ok) throw new Error('Failed to fetch image');
-          
-          const blob = await response.blob();
-          
-          // Tenta criar um File se o construtor estiver disponível
-          try {
-            // @ts-ignore - File pode não estar disponível em todos os ambientes
-            if (typeof File !== 'undefined') {
-              return new File([blob], filename, { type });
-            }
-          } catch (e) {
-            console.warn('File constructor not available, using Blob instead', e);
-          }
-          
-          // Fallback para Blob
-          return blob;
-        }
-      } catch (error) {
-        console.error('Error processing image in web environment:', error);
-        throw error;
+      // Verifica se é uma URI de arquivo local (React Native)
+      if (uri.startsWith('file://') || uri.startsWith('content://')) {
+        // Para React Native, retorna um objeto compatível com FormData
+        return {
+          uri,
+          name: filename,
+          type: type
+        };
       }
       
-      // Para React Native
-      return {
-        uri,
-        name: filename,
-        type
-      } as any;
+      // Para ambiente web
+      try {
+        const response = await fetch(uri);
+        if (!response.ok) throw new Error('Failed to fetch image');
+        
+        const blob = await response.blob();
+        
+        // Tenta criar um File se o construtor estiver disponível
+        if (typeof File !== 'undefined') {
+          return new File([blob], filename, { type });
+        }
+        
+        // Fallback para Blob
+        return blob;
+      } catch (error) {
+        console.error('Error processing image:', error);
+        throw error;
+      }
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
       return null;
@@ -170,6 +169,8 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
       
       // Criar FormData
       const formData = new FormData();
+      
+      // Adicionar campos de texto
       formData.append('nome', nome);
       formData.append('descricao', descricao);
       formData.append('jogoId', jogoId);
@@ -178,10 +179,47 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
       
       // Adicionar o arquivo de imagem apenas se houver uma nova imagem selecionada
       if (imageUri) {
+        console.log('Processando imagem:', imageUri);
         const imageFile = await getFileFromImageUri(imageUri);
+        
         if (imageFile) {
-          formData.append('image', imageFile);
+          // Log detalhado baseado no tipo do arquivo
+          if ('uri' in imageFile) {
+            // ReactNativeFile
+            console.log('Imagem processada (React Native):', {
+              fileType: 'ReactNativeFile',
+              fileName: imageFile.name,
+              fileUri: imageFile.uri
+            });
+            // Para React Native, usamos o objeto diretamente
+            formData.append('image', imageFile as any);
+          } else if (imageFile instanceof File) {
+            // File
+            console.log('Imagem processada (File):', {
+              fileType: 'File',
+              fileName: imageFile.name,
+              fileSize: imageFile.size,
+              mimeType: imageFile.type
+            });
+            formData.append('image', imageFile);
+          } else if (imageFile instanceof Blob) {
+            // Blob
+            console.log('Imagem processada (Blob):', {
+              fileType: 'Blob',
+              fileSize: imageFile.size,
+              mimeType: imageFile.type
+            });
+            formData.append('image', imageFile);
+          } else {
+            console.warn('Tipo de arquivo não suportado:', imageFile);
+          }
+        } else {
+          console.warn('Não foi possível processar a imagem');
         }
+      } else if (item?.image) {
+        console.log('Usando imagem existente do item');
+        // Se não há nova imagem, mas há uma imagem existente, não fazemos nada
+        // O backend deve manter a imagem existente
       }
       
       // Se estiver editando, adicionar o ID
@@ -189,14 +227,25 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
         formData.append('id', item.id);
       }
       
-      console.log('Tentando enviar item com ' + (imageUri ? 'nova imagem' : 'mesma imagem'));
+      console.log('Enviando formulário com dados:', {
+        nome,
+        jogoId,
+        categoria: categoriaValida,
+        raridade: raridadeValida,
+        temImagem: !!(imageUri || (item && item.image)),
+        estaEditando: !!(item && item.id)
+      });
       
       await onSave(formData);
       resetForm();
       onClose();
     } catch (error) {
-      console.error('Erro ao salvar item:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o item');
+      console.error('Erro ao salvar item:', {
+        error,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      Alert.alert('Erro', 'Não foi possível salvar o item. Verifique o console para mais detalhes.');
     } finally {
       setIsLoading(false);
     }

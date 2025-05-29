@@ -139,21 +139,26 @@ export const updateSkin = async (updatedSkin: SkinItem): Promise<boolean> => {
 // Função para deletar uma skin na API
 export const deleteSkin = async (id: string): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DELETE}`, {
+    if (!id) {
+      throw new Error('ID da skin não fornecido para exclusão');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DELETE}/${id}`, {
       method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify({ id }), // Envia apenas o ID para deletar
     });
     
     if (!response.ok) {
-      throw new Error(`Erro ao deletar skin: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Erro na resposta da API:', errorText);
+      throw new Error(`Erro ao deletar skin: ${response.status} - ${errorText}`);
     }
     
     return true;
   } catch (error) {
     console.error('Falha ao deletar skin na API:', error);
-    return false;
+    throw error; // Re-throw para que o chamador possa lidar com o erro
   }
 };

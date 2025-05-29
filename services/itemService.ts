@@ -26,11 +26,7 @@ export const getItems = async () => {
 
 export const createItem = async (formData: FormData) => {
   try {
-    const response = await api.post(ENDPOINTS.CREATE, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.post(ENDPOINTS.CREATE, formData);
     return response.data;
   } catch (error) {
     console.error('Erro ao criar item:', error);
@@ -40,11 +36,7 @@ export const createItem = async (formData: FormData) => {
 
 export const updateItem = async (id: string, formData: FormData) => {
   try {
-    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData);
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar item:', error);

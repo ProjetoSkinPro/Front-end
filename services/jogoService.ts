@@ -23,11 +23,8 @@ export const getJogos = async () => {
 
 export const createJogo = async (formData: FormData) => {
   try {
-    const response = await api.post(ENDPOINTS.CREATE, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Removendo o cabeçalho Content-Type para permitir que o interceptor do Axios o defina automaticamente
+    const response = await api.post(ENDPOINTS.CREATE, formData);
     return response.data;
   } catch (error) {
     console.error('Erro ao criar jogo:', error);
@@ -37,11 +34,8 @@ export const createJogo = async (formData: FormData) => {
 
 export const updateJogo = async (id: string, formData: FormData) => {
   try {
-    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Removendo o cabeçalho Content-Type para permitir que o interceptor do Axios o defina automaticamente
+    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData);
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar jogo:', error);

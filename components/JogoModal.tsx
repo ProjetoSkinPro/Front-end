@@ -7,12 +7,28 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Jogo } from '../services/jogoService';
 
+// Interface para o objeto de arquivo do React Native
+interface ReactNativeImageFile {
+  uri: string;
+  name?: string;
+  type?: string;
+}
+
+// Interface para o jogo conforme usado neste componente, sem estender a original
+interface JogoExtended {
+  id?: string;
+  nome: string;
+  logo?: string | File | ReactNativeImageFile | any; // any para compatibilidade
+  imagem?: string | ReactNativeImageFile | any; // any para compatibilidade
+  bg?: File | string | ReactNativeImageFile | any; // any para compatibilidade
+}
+
 interface JogoModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: (formData: FormData) => Promise<void>;
   jogos: Jogo[];
-  jogo?: Jogo | null;
+  jogo?: JogoExtended | null;
 }
 
 const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, jogo }) => {
@@ -26,8 +42,39 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
   React.useEffect(() => {
     if (jogo) {
       setNome(jogo.nome || '');
-      setLogoUri(jogo.logo || null);
-      setImagemUri(jogo.imagem || null);
+      // Verificar o tipo de logo e tratar adequadamente
+      if (jogo.logo) {
+        // Se for uma string (URI), usar diretamente
+        if (typeof jogo.logo === 'string') {
+          setLogoUri(jogo.logo);
+        } else {
+          // Se for um objeto File/Blob, converter para string se possível
+          console.log('Logo do jogo é um objeto, não uma string URI');
+          // Se tivermos uma URL ou uri disponível no objeto (React Native)
+          if (typeof jogo.logo === 'object' && 'uri' in jogo.logo && typeof jogo.logo.uri === 'string') {
+            setLogoUri(jogo.logo.uri);
+          } else {
+            setLogoUri(null);
+          }
+        }
+      } else {
+        setLogoUri(null);
+      }
+      
+      // Tratamento similar para imagem
+      if (jogo.imagem) {
+        if (typeof jogo.imagem === 'string') {
+          setImagemUri(jogo.imagem);
+        } else if (typeof jogo.imagem === 'object' && 
+                   'uri' in jogo.imagem && 
+                   typeof jogo.imagem.uri === 'string') {
+          setImagemUri(jogo.imagem.uri);
+        } else {
+          setImagemUri(null);
+        }
+      } else {
+        setImagemUri(null);
+      }
     } else {
       resetForm();
     }
@@ -48,7 +95,8 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'Images',
+        // @ts-ignore - Usando string diretamente para evitar erros de tipo
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
@@ -72,7 +120,8 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'Images',
+        // @ts-ignore - Usando string diretamente para evitar erros de tipo
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [16, 9],
         quality: 1,
@@ -87,9 +136,65 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
     }
   };
 
+  // Interface para o objeto de arquivo do React Native
+  interface ReactNativeFile {
+    uri: string;
+    name: string;
+    type: string;
+  }
+
+  // Função auxiliar para obter um File/Blob a partir de uma URI
+  const getFileFromImageUri = async (uri: string): Promise<File | Blob | ReactNativeFile | null> => {
+    try {
+      if (!uri) return null;
+      
+      const filename = uri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      // Verifica se é uma URI de arquivo local (React Native)
+      if (uri.startsWith('file://') || uri.startsWith('content://')) {
+        // Para React Native, retorna um objeto compatível com FormData
+        return {
+          uri,
+          name: filename,
+          type: type
+        };
+      }
+      
+      // Para ambiente web
+      try {
+        const response = await fetch(uri);
+        if (!response.ok) throw new Error('Failed to fetch image');
+        
+        const blob = await response.blob();
+        
+        // Tenta criar um File se o construtor estiver disponível
+        if (typeof File !== 'undefined') {
+          return new File([blob], filename, { type });
+        }
+        
+        // Fallback para Blob
+        return blob;
+      } catch (error) {
+        console.error('Error processing image:', error);
+        throw error;
+      }
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
-    if (!nome || !logoUri || !imagemUri) {
-      Alert.alert('Campos obrigatórios', 'Por favor, preencha o nome e selecione as imagens');
+    if (!nome) {
+      Alert.alert('Campo obrigatório', 'Por favor, preencha o nome do jogo');
+      return;
+    }
+
+    // Se estiver em modo de edição, não exigir seleção de imagens
+    if (!modoEdicao && (!logoUri || !imagemUri)) {
+      Alert.alert('Imagens obrigatórias', 'Por favor, selecione uma logo e uma imagem para o jogo');
       return;
     }
 
@@ -100,38 +205,91 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
       const formData = new FormData();
       formData.append('nome', nome);
       
-      // Adicionar o arquivo de logo
-      if (logoUri) {
-        const logoFilename = logoUri.split('/').pop();
-        const logoMatch = /\.(\w+)$/.exec(logoFilename || '');
-        const logoType = logoMatch ? `image/${logoMatch[1]}` : 'image';
-        
-        formData.append('logo', {
-          uri: logoUri,
-          name: logoFilename,
-          type: logoType,
-        } as any);
+      // Se estiver editando, incluir o ID
+      if (modoEdicao && jogo?.id) {
+        formData.append('id', jogo.id);
       }
       
-      // Adicionar o arquivo de imagem
-      if (imagemUri) {
-        const imagemFilename = imagemUri.split('/').pop();
-        const imagemMatch = /\.(\w+)$/.exec(imagemFilename || '');
-        const imagemType = imagemMatch ? `image/${imagemMatch[1]}` : 'image';
+      // Processar e adicionar o arquivo de logo
+      if (logoUri) {
+        console.log('Processando logo:', logoUri);
+        const logoFile = await getFileFromImageUri(logoUri);
         
-        formData.append('imagem', {
-          uri: imagemUri,
-          name: imagemFilename,
-          type: imagemType,
-        } as any);
+        if (logoFile) {
+          // Log detalhado baseado no tipo do arquivo
+          if ('uri' in logoFile) {
+            console.log('Logo processada (React Native):', {
+              fileType: 'ReactNativeFile',
+              fileName: logoFile.name,
+              fileUri: logoFile.uri
+            });
+            formData.append('logo', logoFile as any);
+          } else if (logoFile instanceof File) {
+            console.log('Logo processada (File):', {
+              fileType: 'File',
+              fileName: logoFile.name,
+              fileSize: logoFile.size
+            });
+            formData.append('logo', logoFile);
+          } else if (logoFile instanceof Blob) {
+            console.log('Logo processada (Blob):', {
+              fileType: 'Blob',
+              fileSize: logoFile.size
+            });
+            formData.append('logo', logoFile);
+          }
+        }
       }
+      
+      // Processar e adicionar o arquivo de imagem de fundo
+      if (imagemUri) {
+        console.log('Processando imagem de fundo:', imagemUri);
+        const imagemFile = await getFileFromImageUri(imagemUri);
+        
+        if (imagemFile) {
+          // Log detalhado baseado no tipo do arquivo
+          if ('uri' in imagemFile) {
+            console.log('Imagem processada (React Native):', {
+              fileType: 'ReactNativeFile',
+              fileName: imagemFile.name,
+              fileUri: imagemFile.uri
+            });
+            formData.append('imagem', imagemFile as any);
+          } else if (imagemFile instanceof File) {
+            console.log('Imagem processada (File):', {
+              fileType: 'File',
+              fileName: imagemFile.name,
+              fileSize: imagemFile.size
+            });
+            formData.append('imagem', imagemFile);
+          } else if (imagemFile instanceof Blob) {
+            console.log('Imagem processada (Blob):', {
+              fileType: 'Blob',
+              fileSize: imagemFile.size
+            });
+            formData.append('imagem', imagemFile);
+          }
+        }
+      }
+      
+      console.log('Enviando formulário de jogo:', {
+        nome,
+        temLogo: !!logoUri,
+        temImagem: !!imagemUri,
+        modoEdicao,
+        id: jogo?.id
+      });
       
       await onSave(formData);
       resetForm();
       onClose();
     } catch (error) {
-      console.error('Erro ao salvar jogo:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o jogo');
+      console.error('Erro ao salvar jogo:', {
+        error,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      Alert.alert('Erro', 'Não foi possível salvar o jogo. Verifique o console para mais detalhes.');
     } finally {
       setIsLoading(false);
     }

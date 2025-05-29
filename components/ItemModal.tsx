@@ -41,7 +41,10 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
 
   // Usar as raridades e categorias fornecidas como props ou os valores padrão dos enums
   const raridadeOptions = raridades?.map(r => r.nome) || RARIDADES;
-  const categoriaOptions = categorias?.map(c => c.nome) || CATEGORIAS;
+  // Garantir que as categorias estejam em maiúsculo, conforme esperado pelo backend
+  const categoriaOptions = categorias?.length > 0 
+    ? categorias.map(c => c.nome.toUpperCase()) 
+    : CATEGORIAS; // CATEGORIAS já está em maiúsculo
 
   useEffect(() => {
     if (item) {
@@ -216,10 +219,33 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
         } else {
           console.warn('Não foi possível processar a imagem');
         }
-      } else if (item?.image) {
-        console.log('Usando imagem existente do item');
-        // Se não há nova imagem, mas há uma imagem existente, não fazemos nada
-        // O backend deve manter a imagem existente
+      } else if (item?.image && item.id) {
+        console.log('Anexando imagem existente do item');
+        // Se não há nova imagem, mas há uma imagem existente e estamos editando, anexamos a imagem existente
+        // Pois o backend pode estar esperando o campo de imagem mesmo para atualizações
+        
+        // Se a imagem é uma string (URL), precisamos processá-la
+        if (typeof item.image === 'string') {
+          try {
+            const imageFile = await getFileFromImageUri(item.image);
+            if (imageFile) {
+              if ('uri' in imageFile) {
+                console.log('Usando imagem existente (React Native)');
+                formData.append('image', imageFile as any);
+              } else if (imageFile instanceof File || imageFile instanceof Blob) {
+                console.log('Usando imagem existente (Web)');
+                formData.append('image', imageFile);
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao processar imagem existente:', error);
+            // Mesmo com erro, continuamos tentando salvar sem a imagem
+          }
+        } else if (typeof item.image === 'object' && item.image !== null) {
+          // Se já é um objeto de imagem, tentamos usá-lo diretamente
+          console.log('Usando objeto de imagem existente');
+          formData.append('image', item.image as any);
+        }
       }
       
       // Se estiver editando, adicionar o ID
@@ -489,12 +515,21 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 5,
     marginBottom: 15,
-    maxHeight: 150,
+    maxHeight: 200, // Aumentado para mostrar mais itens
+    backgroundColor: '#fff', // Garantir fundo branco para melhor visibilidade
+    elevation: 5, // Sombra para Android
+    shadowColor: '#000', // Sombra para iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 1000, // Garantir que o dropdown fique acima de outros elementos
+    position: 'relative', // Importante para a exibição correta
   },
   dropdownItem: {
-    padding: 10,
+    padding: 12, // Aumento do padding para facilitar o toque em dispositivos móveis
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#f9f9f9', // Fundo mais claro para diferenciar os itens
   },
   selectedDropdownItem: {
     backgroundColor: '#f0f8ff',

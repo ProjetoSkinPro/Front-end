@@ -20,7 +20,7 @@ export const getItems = async () => {
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar itens:', error);
-    throw error;
+    throw new Error(`Falha ao buscar itens: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -34,7 +34,7 @@ export const createItem = async (formData: FormData) => {
     return response.data;
   } catch (error) {
     console.error('Erro ao criar item:', error);
-    throw error;
+    throw new Error(`Falha ao criar item: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -48,15 +48,16 @@ export const updateItem = async (id: string, formData: FormData) => {
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar item:', error);
-    throw error;
+    throw new Error(`Falha ao atualizar item: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 export const deleteItem = async (id: string) => {
   try {
-    await api.delete(`${ENDPOINTS.DELETE}/${id}`);
+    const response = await api.delete(`${ENDPOINTS.DELETE}/${id}`);
+    return response.data;
   } catch (error) {
     console.error('Erro ao deletar item:', error);
-    throw error;
+    throw new Error(`Falha ao deletar item: ${error instanceof Error ? error.message : String(error)}`);
   }
 };

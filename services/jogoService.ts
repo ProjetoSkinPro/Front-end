@@ -17,7 +17,7 @@ export const getJogos = async () => {
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar jogos:', error);
-    throw error;
+    throw new Error(`Falha ao buscar jogos: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -31,7 +31,7 @@ export const createJogo = async (formData: FormData) => {
     return response.data;
   } catch (error) {
     console.error('Erro ao criar jogo:', error);
-    throw error;
+    throw new Error(`Falha ao criar jogo: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -45,15 +45,16 @@ export const updateJogo = async (id: string, formData: FormData) => {
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar jogo:', error);
-    throw error;
+    throw new Error(`Falha ao atualizar jogo: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 export const deleteJogo = async (id: string) => {
   try {
-    await api.delete(`${ENDPOINTS.DELETE}/${id}`);
+    const response = await api.delete(`${ENDPOINTS.DELETE}/${id}`);
+    return response.data;
   } catch (error) {
     console.error('Erro ao deletar jogo:', error);
-    throw error;
+    throw new Error(`Falha ao deletar jogo: ${error instanceof Error ? error.message : String(error)}`);
   }
 };

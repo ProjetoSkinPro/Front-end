@@ -62,11 +62,13 @@ export const useSkins = () => {
   const handleUpdateSkin = async () => {
     if (!skinToEdit) return;
     
-    // Tenta atualizar a skin via API
-    const success = await updateSkin(skinToEdit);
-    
-    if (success) {
-      // Reinicia e fecha o modal
+    try {
+      setIsLoading(true);
+      
+      // Tenta atualizar a skin via API
+      await updateSkin(skinToEdit);
+      
+      // Se chegou aqui, a atualização foi bem-sucedida
       setEditModalVisible(false);
       setSkinToEdit(null);
       
@@ -79,6 +81,18 @@ export const useSkins = () => {
       
       // Recarrega a lista
       await fetchSkins();
+    } catch (error) {
+      console.error('Erro ao atualizar skin:', error);
+      
+      // Mostra mensagem de erro mais detalhada
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro ao atualizar a skin.';
+      Alert.alert(
+        'Erro',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -99,34 +113,43 @@ export const useSkins = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              setIsLoading(true);
               // Encontra a skin para usar o nome na confirmação
               const skinToDelete = skins.find(skin => skin.id === id);
               
               // Tenta deletar via API
-              const success = await deleteSkin(id);
+              await deleteSkin(id);
               
-              if (success) {
-                // Fecha todos os modais
-                setViewModalVisible(false);
-                setEditModalVisible(false);
-                
-                // Reinicia os itens selecionados
-                setSelectedItem(null);
-                setSkinToEdit(null);
-                
-                // Mostra alerta de sucesso
-                Alert.alert(
-                  'Sucesso!',
-                  `Skin "${skinToDelete?.nome || 'Selecionada'}" excluída com sucesso.`,
-                  [{ text: 'OK' }]
-                );
-                
-                // Recarrega a lista
-                await fetchSkins();
-              }
+              // Se chegou aqui, a exclusão foi bem-sucedida
+              // Fecha todos os modais
+              setViewModalVisible(false);
+              setEditModalVisible(false);
+              
+              // Reinicia os itens selecionados
+              setSelectedItem(null);
+              setSkinToEdit(null);
+              
+              // Mostra alerta de sucesso
+              Alert.alert(
+                'Sucesso!',
+                `Skin "${skinToDelete?.nome || 'Selecionada'}" excluída com sucesso.`,
+                [{ text: 'OK' }]
+              );
+              
+              // Recarrega a lista
+              await fetchSkins();
             } catch (error) {
-              console.error('Erro ao excluir:', error);
-              Alert.alert('Erro', 'Não foi possível excluir a skin.');
+              console.error('Erro ao excluir skin:', error);
+              
+              // Mostra mensagem de erro mais detalhada
+              const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro ao excluir a skin.';
+              Alert.alert(
+                'Erro',
+                errorMessage,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsLoading(false);
             }
           }
         }

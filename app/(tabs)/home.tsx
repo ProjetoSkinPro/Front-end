@@ -238,6 +238,9 @@ export default function HomeScreen() {
             onSave={handleSaveItem}
             item={selectedItemLegacy}
             jogos={jogos.map(jogo => ({ id: jogo.id || '', nome: jogo.nome }))}
+            categorias={[]} // Adicione as categorias reais aqui se necessário
+            raridades={rarityOptions.map(r => ({ id: r.value, nome: r.label }))}
+            editando={!!selectedItemLegacy}
           />
 
           {/* Modal para adicionar jogo */}
@@ -245,6 +248,8 @@ export default function HomeScreen() {
             visible={jogoModalVisible}
             onClose={() => setJogoModalVisible(false)}
             onSave={handleSaveJogo}
+            jogos={jogos} // Passando a lista de jogos como prop
+            jogo={null} // Sem jogo para adicionar novo
           />
           
           {/* Modal para visualização de skin */}
@@ -265,6 +270,7 @@ export default function HomeScreen() {
             onSave={handleUpdateSkin}
             onInputChange={handleEditSkinInputChange}
             rarityOptions={rarityOptions}
+            jogos={jogos.map(jogo => ({ id: jogo.id || '', nome: jogo.nome }))}
           />
         </>
       )}

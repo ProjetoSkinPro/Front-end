@@ -1,7 +1,17 @@
-import React from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { SkinItem, RarityOption } from '../types';
+import { rarityOptions as defaultRarityOptions } from '../constants/rarityOptions';
+
+type ImageInfo = {
+  uri: string;
+  type?: string;
+  name?: string;
+};
+
+type InputValue = string | ImagePicker.ImagePickerAsset | null;
 
 interface SkinModalProps {
   visible: boolean;
@@ -9,8 +19,9 @@ interface SkinModalProps {
   skin: SkinItem | null;
   isEditing: boolean;
   onSave?: () => void;
-  onInputChange?: (field: keyof SkinItem, value: string) => void;
+  onInputChange?: (field: keyof SkinItem, value: InputValue) => void;
   rarityOptions: RarityOption[];
+  jogos?: Array<{ id: string; nome: string }>;
 }
 
 const SkinModal = ({
@@ -20,12 +31,30 @@ const SkinModal = ({
   isEditing,
   onSave,
   onInputChange,
-  rarityOptions
-}: SkinModalProps) => {
+  rarityOptions = defaultRarityOptions,
+  jogos = []
+}: SkinModalProps & { jogos?: Array<{ id: string; nome: string }> }) => {
+  // Estados para controlar a visibilidade dos dropdowns
+  const [showRarityDropdown, setShowRarityDropdown] = useState(false);
+  const [showGameDropdown, setShowGameDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  // Opções de categoria
+  const categoryOptions = [
+    { value: 'SKIN', label: 'Skin' },
+    { value: 'ITEM', label: 'Item' },
+  ];
+
   // Função para obter a cor com base na raridade
   const getRarityColor = (rarityValue: string): string => {
-    const option = rarityOptions.find(opt => opt.value.toLowerCase() === rarityValue.toLowerCase());
+    const option = rarityOptions.find(opt => opt.value.toLowerCase() === rarityValue?.toLowerCase());
     return option ? option.color : '#FFFFFF'; // Default to white if not found
+  };
+
+  // Função para formatar o valor da raridade para exibição
+  const formatRarityLabel = (rarityValue: string): string => {
+    const option = rarityOptions.find(opt => opt.value.toLowerCase() === rarityValue?.toLowerCase());
+    return option ? option.label : 'Selecione a raridade';
   };
 
   if (!skin) return null;
@@ -47,9 +76,12 @@ const SkinModal = ({
             {/* Imagem da skin */}
             <View style={styles.imageContainer}>
               <Image
-                source={{ uri: skin.imgUrl || skin.image }}
+                source={{ uri: typeof skin.imgUrl === 'string' ? skin.imgUrl : 
+                         typeof skin.image === 'string' ? skin.image : 
+                         skin.image?.uri || '' }}
                 style={styles.skinImage}
                 contentFit="cover"
+                onError={(e) => console.log('Erro ao carregar imagem:', e)}
               />
             </View>
             
@@ -67,31 +99,100 @@ const SkinModal = ({
                 />
                 
                 <Text style={styles.label}>Jogo:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={skin.jogoNome || skin.game}
-                  onChangeText={(text) => onInputChange?.('jogoNome', text)}
-                  placeholder="Nome do jogo"
-                  placeholderTextColor="#888"
-                />
+                <TouchableOpacity 
+                  style={styles.dropdownSelector}
+                  onPress={() => {
+                    setShowGameDropdown(!showGameDropdown);
+                    setShowRarityDropdown(false);
+                    setShowCategoryDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownSelectorText}>
+                    {jogos.find(j => j.id === skin.jogoId)?.nome || 'Selecione o jogo'}
+                  </Text>
+                </TouchableOpacity>
+                {showGameDropdown && (
+                  <View style={styles.dropdownList}>
+                    {jogos.map((jogo) => (
+                      <TouchableOpacity
+                        key={jogo.id}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          onInputChange?.('jogoId', jogo.id);
+                          onInputChange?.('jogoNome', jogo.nome);
+                          setShowGameDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownItemText}>{jogo.nome}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 
                 <Text style={styles.label}>Raridade:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={skin.raridade || skin.rarity}
-                  onChangeText={(text) => onInputChange?.('raridade', text)}
-                  placeholder="Raridade"
-                  placeholderTextColor="#888"
-                />
+                <TouchableOpacity 
+                  style={styles.dropdownSelector}
+                  onPress={() => {
+                    setShowRarityDropdown(!showRarityDropdown);
+                    setShowGameDropdown(false);
+                    setShowCategoryDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownSelectorText}>
+                    {formatRarityLabel(skin.raridade || skin.rarity || '')}
+                  </Text>
+                </TouchableOpacity>
+                {showRarityDropdown && (
+                  <View style={styles.dropdownList}>
+                    {rarityOptions.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.dropdownItem,
+                          { borderLeftColor: option.color, borderLeftWidth: 3 }
+                        ]}
+                        onPress={() => {
+                          onInputChange?.('raridade', option.value);
+                          setShowRarityDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, { color: option.color }]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 
                 <Text style={styles.label}>Categoria:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={skin.categoria}
-                  onChangeText={(text) => onInputChange?.('categoria', text)}
-                  placeholder="Categoria"
-                  placeholderTextColor="#888"
-                />
+                <TouchableOpacity 
+                  style={styles.dropdownSelector}
+                  onPress={() => {
+                    setShowCategoryDropdown(!showCategoryDropdown);
+                    setShowGameDropdown(false);
+                    setShowRarityDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownSelectorText}>
+                    {skin.categoria || 'Selecione a categoria'}
+                  </Text>
+                </TouchableOpacity>
+                {showCategoryDropdown && (
+                  <View style={styles.dropdownList}>
+                    {categoryOptions.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          onInputChange?.('categoria', option.value);
+                          setShowCategoryDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownItemText}>{option.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 
                 <Text style={styles.label}>Descrição:</Text>
                 <TextInput
@@ -104,14 +205,44 @@ const SkinModal = ({
                   numberOfLines={4}
                 />
                 
-                <Text style={styles.label}>URL da Imagem:</Text>
-                <TextInput
-                  style={styles.input}
-                  value={skin.imgUrl || skin.image}
-                  onChangeText={(text) => onInputChange?.('imgUrl', text)}
-                  placeholder="URL da imagem"
-                  placeholderTextColor="#888"
-                />
+                <Text style={styles.label}>Imagem:</Text>
+                <TouchableOpacity 
+                  style={styles.uploadButton}
+                  onPress={async () => {
+                    try {
+                      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (status !== 'granted') {
+                        Alert.alert('Permissão necessária', 'Precisamos de permissão para acessar a galeria de imagens.');
+                        return;
+                      }
+
+                      const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                        allowsEditing: true,
+                        aspect: [4, 3],
+                        quality: 1,
+                      });
+
+                      if (!result.canceled) {
+                        onInputChange?.('image', result.assets[0]);
+                      }
+                    } catch (error) {
+                      console.error('Erro ao selecionar imagem:', error);
+                      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
+                    }
+                  }}
+                >
+                  <Text style={styles.uploadButtonText}>
+                    {skin.image ? 'Alterar Imagem' : 'Selecionar Imagem'}
+                  </Text>
+                </TouchableOpacity>
+                {skin.image && (
+                  <Image
+                    source={{ uri: typeof skin.image === 'string' ? skin.image : (skin.image as any).uri || '' }}
+                    style={styles.previewImage}
+                    contentFit="cover"
+                  />
+                )}
                 
                 <TouchableOpacity style={styles.saveButton} onPress={onSave}>
                   <Text style={styles.saveButtonText}>Salvar Alterações</Text>
@@ -137,6 +268,35 @@ const SkinModal = ({
 };
 
 const styles = StyleSheet.create({
+  dropdownSelector: {
+    backgroundColor: '#333',
+    borderRadius: 5,
+    padding: 12,
+    marginBottom: 15,
+  },
+  dropdownSelectorText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  dropdownList: {
+    backgroundColor: '#222',
+    borderRadius: 5,
+    marginTop: -10,
+    marginBottom: 15,
+    maxHeight: 200,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  dropdownItemText: {
+    color: 'white',
+    fontSize: 16,
+  },
   centeredView: {
     flex: 1,
     justifyContent: 'center',
@@ -223,8 +383,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     color: 'white',
     borderRadius: 5,
-    padding: 10,
+    padding: 12,
     marginBottom: 15,
+  },
+  uploadButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  uploadButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 5,
+    marginTop: 10,
   },
   textArea: {
     height: 100,

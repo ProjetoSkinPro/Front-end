@@ -1,5 +1,11 @@
 // Definição de tipos para toda a aplicação
 
+export interface ImageInfo {
+  uri: string;
+  name?: string;
+  type?: string;
+}
+
 export interface SkinItem {
   id: string;
   nome: string;
@@ -15,7 +21,7 @@ export interface SkinItem {
   game?: string;  // Para compatibilidade com código existente
   rarity?: string; // Para compatibilidade com código existente
   price?: string;  // Para compatibilidade com código existente
-  image?: string;  // Para compatibilidade com código existente
+  image?: string | ImageInfo;  // Pode ser uma URL (string) ou um objeto com informações da imagem
   description?: string; // Para compatibilidade com código existente
 }
 

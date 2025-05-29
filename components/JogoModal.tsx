@@ -5,13 +5,7 @@ import { Modal, View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, Scro
 import { Image } from 'expo-image';
 // @ts-ignore
 import * as ImagePicker from 'expo-image-picker';
-
-interface Jogo {
-  id: string;
-  nome: string;
-  logo?: string;
-  imagem?: string;
-}
+import { Jogo } from '../services/jogoService';
 
 interface JogoModalProps {
   visible: boolean;

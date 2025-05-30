@@ -32,9 +32,10 @@ interface JogoModalProps {
 }
 
 const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, jogo }) => {
-  const [nome, setNome] = useState('');
-  const [logoUri, setLogoUri] = useState<string | null>(null);
-  const [imagemUri, setImagemUri] = useState<string | null>(null);
+  // Inicializando com valores vazios para evitar problemas de controlado/não-controlado
+  const [nome, setNome] = useState(jogo?.nome || '');
+  const [logoUri, setLogoUri] = useState<string | null>(typeof jogo?.logo === 'string' ? jogo.logo : null);
+  const [imagemUri, setImagemUri] = useState<string | null>(typeof jogo?.imagem === 'string' ? jogo.imagem : null);
   const [isLoading, setIsLoading] = useState(false);
   const modoEdicao = !!jogo;
   
@@ -95,8 +96,7 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        // @ts-ignore - Usando string diretamente para evitar erros de tipo
-        mediaTypes: 'images',
+        mediaTypes: "images",
         allowsEditing: true,
         aspect: [1, 1],
         quality: 1,
@@ -120,8 +120,7 @@ const JogoModal: React.FC<JogoModalProps> = ({ visible, onClose, onSave, jogos, 
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        // @ts-ignore - Usando string diretamente para evitar erros de tipo
-        mediaTypes: 'images',
+        mediaTypes: "images",
         allowsEditing: true,
         aspect: [16, 9],
         quality: 1,

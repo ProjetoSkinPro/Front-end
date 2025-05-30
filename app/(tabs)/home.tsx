@@ -100,29 +100,16 @@ export default function HomeScreen() {
     }
   };
   
-  // Função para excluir item
-  const handleDeleteItem = (id: string) => {
-    Alert.alert(
-      'Confirmar exclusão',
-      'Tem certeza que deseja excluir este item?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteItem(id);
-              Alert.alert('Sucesso', 'Item excluído com sucesso!');
-              await fetchSkins();
-            } catch (error) {
-              console.error('Erro ao excluir item:', error);
-              Alert.alert('Erro', 'Não foi possível excluir o item.');
-            }
-          }
-        }
-      ]
-    );
+  // Função para excluir item - sem confirmação
+  const handleDeleteItem = async (id: string) => {
+    try {
+      await deleteItem(id);
+      console.log('Item excluído com sucesso!');
+      await fetchSkins();
+    } catch (error) {
+      console.error('Erro ao excluir item:', error);
+      Alert.alert('Erro', 'Não foi possível excluir o item.');
+    }
   };
   
   // Renderização dos itens na lista
@@ -152,8 +139,8 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={(e) => {
               e.stopPropagation();
-              // Usar nossa nova função de deletar skin
-              handleDeletePress(item.id);
+              // Usar a função correta para deletar item
+              handleDeleteItem(item.id);
             }}>
               <Text style={styles.actionIcon}>🗑️</Text>
             </TouchableOpacity>

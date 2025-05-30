@@ -36,7 +36,17 @@ export const createItem = async (formData: FormData) => {
 
 export const updateItem = async (id: string, formData: FormData) => {
   try {
-    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData);
+    // Usar o Content-Type certo para o FormData
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    };
+    
+    // Log simples para acompanhamento
+    console.log(`Atualizando item com ID: ${id}`);
+    
+    const response = await api.put(`${ENDPOINTS.UPDATE}/${id}`, formData, config);
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar item:', error);

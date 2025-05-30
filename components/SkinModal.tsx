@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { SkinItem, RarityOption } from '../types';
+import React, { useState } from 'react';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { rarityOptions as defaultRarityOptions } from '../constants/rarityOptions';
+import { RarityOption, SkinItem } from '../types';
 
 type ImageInfo = {
   uri: string;
@@ -92,7 +92,7 @@ const SkinModal = ({
                 <Text style={styles.label}>Nome:</Text>
                 <TextInput
                   style={styles.input}
-                  value={skin.nome || skin.name}
+                  value={skin.nome || skin.name || ''}
                   onChangeText={(text) => onInputChange?.('nome', text)}
                   placeholder="Nome da skin"
                   placeholderTextColor="#888"
@@ -217,7 +217,7 @@ const SkinModal = ({
                       }
 
                       const result = await ImagePicker.launchImageLibraryAsync({
-                        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                        mediaTypes: "images",
                         allowsEditing: true,
                         aspect: [4, 3],
                         quality: 1,

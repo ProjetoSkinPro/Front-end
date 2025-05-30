@@ -28,11 +28,12 @@ const CATEGORIAS = ['SKIN', 'ITEM'];
 const RARIDADES = ['COMUM', 'INCOMUM', 'RARO', 'EPICO', 'LENDARIO'];
 
 const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, jogos, categorias, raridades, editando }) => {
-  const [nome, setNome] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [categoria, setCategoria] = useState(DEFAULT_CATEGORIA);
-  const [raridade, setRaridade] = useState(DEFAULT_RARIDADE);
-  const [jogoId, setJogoId] = useState('');
+  // Garantindo que todos os campos tenham valores iniciais de string vazia em vez de undefined
+  const [nome, setNome] = useState(item?.nome || '');
+  const [descricao, setDescricao] = useState(item?.descricao || '');
+  const [categoria, setCategoria] = useState(item?.categoria || DEFAULT_CATEGORIA);
+  const [raridade, setRaridade] = useState(item?.raridade || DEFAULT_RARIDADE);
+  const [jogoId, setJogoId] = useState(item?.jogoId || '');
   const [jogoDropdownVisible, setJogoDropdownVisible] = useState(false);
   const [raridadeDropdownVisible, setRaridadeDropdownVisible] = useState(false);
   const [categoriaDropdownVisible, setCategoriaDropdownVisible] = useState(false);
@@ -88,10 +89,8 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
         return;
       }
 
-      // @ts-ignore - Ignoring MediaTypeOptions TypeScript error
       const result = await ImagePicker.launchImageLibraryAsync({
-        // @ts-ignore - Using string directly instead of enum to avoid TypeScript error
-        mediaTypes: 'Images',
+        mediaTypes: "images",
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
@@ -180,9 +179,15 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
       formData.append('categoria', categoriaValida);
       formData.append('raridade', raridadeValida);
       
+      // Flag para controle
+      if (item && item.id) {
+        // Se estamos editando, enviar uma flag para indicar isso
+        formData.append('isUpdate', 'true');
+      }
+      
       // Adicionar o arquivo de imagem apenas se houver uma nova imagem selecionada
       if (imageUri) {
-        console.log('Processando imagem:', imageUri);
+        console.log('Processando nova imagem selecionada:', imageUri);
         const imageFile = await getFileFromImageUri(imageUri);
         
         if (imageFile) {
@@ -196,56 +201,37 @@ const ItemModal: React.FC<ItemModalProps> = ({ visible, onClose, onSave, item, j
             });
             // Para React Native, usamos o objeto diretamente
             formData.append('image', imageFile as any);
-          } else if (imageFile instanceof File) {
-            // File
-            console.log('Imagem processada (File):', {
-              fileType: 'File',
-              fileName: imageFile.name,
-              fileSize: imageFile.size,
-              mimeType: imageFile.type
-            });
+          } else if (imageFile instanceof File || imageFile instanceof Blob) {
+            console.log('Ambiente Web detectado');
             formData.append('image', imageFile);
-          } else if (imageFile instanceof Blob) {
-            // Blob
-            console.log('Imagem processada (Blob):', {
-              fileType: 'Blob',
-              fileSize: imageFile.size,
-              mimeType: imageFile.type
-            });
-            formData.append('image', imageFile);
-          } else {
-            console.warn('Tipo de arquivo não suportado:', imageFile);
           }
         } else {
           console.warn('Não foi possível processar a imagem');
         }
-      } else if (item?.image && item.id) {
-        console.log('Anexando imagem existente do item');
-        // Se não há nova imagem, mas há uma imagem existente e estamos editando, anexamos a imagem existente
-        // Pois o backend pode estar esperando o campo de imagem mesmo para atualizações
-        
-        // Se a imagem é uma string (URL), precisamos processá-la
-        if (typeof item.image === 'string') {
-          try {
-            const imageFile = await getFileFromImageUri(item.image);
-            if (imageFile) {
-              if ('uri' in imageFile) {
-                console.log('Usando imagem existente (React Native)');
-                formData.append('image', imageFile as any);
-              } else if (imageFile instanceof File || imageFile instanceof Blob) {
-                console.log('Usando imagem existente (Web)');
-                formData.append('image', imageFile);
-              }
+      } else if (item?.image && typeof item.image === 'string') {
+        // Se não temos uma nova imagem, mas temos uma URL de imagem existente
+        try {
+          console.log('Tentando obter arquivo a partir da URL existente:', item.image);
+          const imageFile = await getFileFromImageUri(item.image);
+          
+          if (imageFile) {
+            if ('uri' in imageFile) {
+              console.log('Reaproveitando imagem existente (React Native)');
+              formData.append('image', imageFile as any);
+            } else if (imageFile instanceof File || imageFile instanceof Blob) {
+              console.log('Reaproveitando imagem existente (Web)');
+              formData.append('image', imageFile);
             }
-          } catch (error) {
-            console.error('Erro ao processar imagem existente:', error);
-            // Mesmo com erro, continuamos tentando salvar sem a imagem
+          } else {
+            console.warn('Não foi possível processar a URL da imagem existente');
           }
-        } else if (typeof item.image === 'object' && item.image !== null) {
-          // Se já é um objeto de imagem, tentamos usá-lo diretamente
-          console.log('Usando objeto de imagem existente');
-          formData.append('image', item.image as any);
+        } catch (error) {
+          console.error('Erro ao processar URL de imagem existente:', error);
         }
+      } else {
+        // Se não há nova imagem e nem imagem existente
+        console.log('Nenhuma imagem enviada');
+        // Não adicionamos nada ao formData relacionado à imagem
       }
       
       // Se estiver editando, adicionar o ID

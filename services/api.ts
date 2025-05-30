@@ -1,6 +1,18 @@
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 
+// Função para verificar se o servidor está disponível
+const checkServerAvailability = async (baseURL: string) => {
+  try {
+    // Realiza uma requisição HEAD para verificar a disponibilidade
+    await axios.head(baseURL, { timeout: 3000 });
+    return true;
+  } catch (error) {
+    console.warn('Servidor API parece estar indisponível:', error);
+    return false;
+  }
+};
+
 const api = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   // Removendo o Content-Type padrão para permitir que o navegador defina automaticamente
@@ -8,6 +20,8 @@ const api = axios.create({
   headers: {
     'Accept': 'application/json',
   },
+  // Adicionando timeout para evitar requisições pendentes por muito tempo
+  timeout: 10000, // 10 segundos
 });
 
 // Interceptor para adicionar headers dinamicamente com base no tipo de requisição
@@ -58,12 +72,32 @@ api.interceptors.request.use(
   }
 );
 
+// Contador de tentativas para cada requisição
+const retryMap = new Map();
+
+// Número máximo de tentativas
+const MAX_RETRY_ATTEMPTS = 2;
+
 // Interceptor para tratamento de erros
 api.interceptors.response.use(
   (response) => {
+    // Resetar contador de tentativas quando a requisição for bem-sucedida
+    const url = response.config.url || '';
+    retryMap.delete(url);
     return response;
   },
-  (error) => {
+  async (error) => {
+    const config = error.config;
+    
+    // Se não tem configuração ou já excedeu o número máximo de tentativas, rejeita
+    if (!config || !config.url) {
+      console.error('API Error (sem config):', error.message);
+      return Promise.reject(error);
+    }
+    
+    // Pega o contador atual de tentativas
+    const currentRetryCount = retryMap.get(config.url) || 0;
+    
     console.error('API Error:', {
       message: error.message,
       response: error.response ? {
@@ -72,12 +106,41 @@ api.interceptors.response.use(
         data: error.response.data,
       } : 'No response',
       config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.config?.data,
-        headers: error.config?.headers,
+        url: config.url,
+        method: config.method,
+        data: config.data,
+        headers: config.headers,
       },
+      retryCount: currentRetryCount,
     });
+    
+    // Verifica se deve tentar novamente
+    if (currentRetryCount < MAX_RETRY_ATTEMPTS) {
+      // Se for um erro de rede (como Network Error), verifica disponibilidade do servidor
+      if (error.message === 'Network Error') {
+        const isServerAvailable = await checkServerAvailability(API_CONFIG.BASE_URL);
+        if (!isServerAvailable) {
+          return Promise.reject(new Error('Servidor indisponível. Verifique sua conexão ou tente novamente mais tarde.'));
+        }
+      }
+      
+      // Incrementa o contador de tentativas
+      retryMap.set(config.url, currentRetryCount + 1);
+      
+      // Aguarda antes de tentar novamente (backoff exponencial)
+      const delayMs = 1000 * Math.pow(2, currentRetryCount);
+      console.log(`Tentando novamente em ${delayMs}ms (tentativa ${currentRetryCount + 1}/${MAX_RETRY_ATTEMPTS})`);
+      
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      
+      // Faz a nova tentativa
+      return api(config);
+    }
+    
+    // Se já tentou o máximo de vezes, rejeita com uma mensagem mais clara
+    if (error.message === 'Network Error') {
+      return Promise.reject(new Error('Falha na conexão com o servidor após múltiplas tentativas. Verifique sua conexão ou se o servidor está disponível.'));
+    }
     
     return Promise.reject(error);
   }

@@ -1,0 +1,359 @@
+=====================================================================
+         DOCUMENTAÇÃO DETALHADA DO CÓDIGO DO PROJETO SKINPRO
+=====================================================================
+
+Data: 03/06/2025
+Versão: 1.0.0
+
+=====================================================================
+ÍNDICE
+=====================================================================
+1. ESTRUTURA GERAL DO PROJETO
+2. CONFIGURAÇÃO DA API
+3. SERVIÇOS (SERVICES)
+4. COMPONENTES PRINCIPAIS
+5. NAVEGAÇÃO E ROTAS
+6. TELAS PRINCIPAIS
+7. FLUXOS DE DADOS
+8. UPLOAD DE IMAGENS
+9. TRATAMENTO DE ERROS
+
+=====================================================================
+1. ESTRUTURA GERAL DO PROJETO
+=====================================================================
+
+O projeto SkinPro é uma aplicação móvel desenvolvida com React Native e Expo
+que permite gerenciar itens (skins) e jogos. A aplicação segue uma arquitetura
+de pastas organizadas por funcionalidade:
+
+- app/: Contém as telas da aplicação usando roteamento baseado em arquivos do Expo Router
+- components/: Componentes reutilizáveis da interface
+- config/: Configurações como URLs e endpoints da API
+- constants/: Constantes utilizadas em toda a aplicação
+- hooks/: Hooks personalizados de React para lógica reutilizável
+- services/: Serviços para comunicação com a API
+- types/: Definições de tipos TypeScript
+
+A aplicação segue o padrão de arquitetura de camadas, onde:
+- A camada de apresentação (app/ e components/) gerencia a interface do usuário
+- A camada de serviços (services/) gerencia a comunicação com o backend
+- A camada de configuração (config/ e constants/) armazena valores constantes
+
+=====================================================================
+2. CONFIGURAÇÃO DA API
+=====================================================================
+
+A configuração da API está centralizada no arquivo config/api.ts:
+
+- API_BASE_URL: Define a URL base da API como 'https://skinpr0.azurewebsites.net/'
+- API_ENDPOINTS: Define todos os endpoints disponíveis organizados por entidade
+
+Os endpoints seguem um padrão RESTful:
+- Lista: GET /entidade/list
+- Criação: POST /entidade/create
+- Atualização: PUT /entidade/update/{id}
+- Remoção: DELETE /entidade/delete/{id}
+
+Exemplo de definição dos endpoints:
+```typescript
+export const API_ENDPOINTS = {
+  // Endpoints para items/skins
+  ITEMS: {
+    LIST: 'item/list',
+    CREATE: 'item/create',
+    UPDATE: 'item/update',
+    DELETE: 'item/delete',
+  },
+  
+  // Endpoints para jogos
+  GAMES: {
+    LIST: 'jogo/list',
+    CREATE: 'jogo/create',
+    UPDATE: 'jogo/update',
+    DELETE: 'jogo/delete',
+  }
+};
+```
+
+=====================================================================
+3. SERVIÇOS (SERVICES)
+=====================================================================
+
+3.1. CONFIGURAÇÃO DO CLIENTE API (api.ts)
+-----------------------------------------
+
+O arquivo services/api.ts configura o cliente Axios para comunicação com o backend:
+
+- Criação da instância do Axios com URL base e configurações padrão
+- Interceptors para pré-processar requisições e respostas
+- Sistema de retry para falhas temporárias
+- Verificação de disponibilidade do servidor
+- Tratamento especial para upload de imagens (FormData)
+
+Principais recursos implementados:
+- Remoção automática de Content-Type para requisições multipart/form-data
+- Adição de timestamp para evitar cache nas requisições
+- Retry automatizado com backoff exponencial (atraso aumenta progressivamente)
+- Verificação de disponibilidade do servidor antes de novas tentativas
+- Logs detalhados para facilitar depuração
+
+Exemplo do interceptor de requisição:
+```typescript
+api.interceptors.request.use(
+  async (config) => {
+    // Se for uma requisição multipart/form-data
+    if (config.data instanceof FormData) {
+      // Remove o Content-Type para permitir que o navegador defina automaticamente
+      // com o boundary correto
+      if (config.headers) {
+        delete config.headers['Content-Type'];
+      }
+    } else if (config.data && typeof config.data === 'object') {
+      // Para outros tipos de dados, define como application/json
+      if (config.headers) {
+        config.headers['Content-Type'] = 'application/json';
+      }
+    }
+    
+    // Adiciona um timestamp para evitar cache
+    if (config.params) {
+      config.params = {
+        ...config.params,
+        _t: Date.now(),
+      };
+    } else {
+      config.params = { _t: Date.now() };
+    }
+    
+    return config;
+  },
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+```
+
+3.2. SERVIÇO DE ITENS (itemService.ts)
+--------------------------------------
+
+O arquivo services/itemService.ts fornece funções para operações CRUD em itens (skins):
+
+- getItems(): Busca todos os itens disponíveis
+- createItem(formData): Cria um novo item com imagem
+- updateItem(id, formData): Atualiza um item existente
+- deleteItem(id): Remove um item
+
+Exemplo da interface de Item:
+```typescript
+export interface Item {
+  id?: string;
+  nome: string;
+  descricao: string;
+  jogoId: string;
+  categoria: string;
+  image?: File;
+  raridade: string;
+}
+```
+
+O serviço utiliza FormData para envio de imagens junto com os dados do item.
+
+3.3. SERVIÇO DE JOGOS (jogoService.ts)
+--------------------------------------
+
+O arquivo services/jogoService.ts implementa funções para operações CRUD em jogos:
+
+- getJogos(): Busca todos os jogos disponíveis
+- createJogo(formData): Cria um novo jogo com logo e imagem de fundo
+- updateJogo(id, formData): Atualiza um jogo existente
+- deleteJogo(id): Remove um jogo
+
+Os jogos podem ter duas imagens associadas: logo e imagem de fundo.
+
+=====================================================================
+4. COMPONENTES PRINCIPAIS
+=====================================================================
+
+A pasta components/ contém diversos componentes reutilizáveis da interface:
+
+- Componentes de formulário (inputs, selects, etc.)
+- Cards para exibição de itens e jogos
+- Botões e elementos de interação
+- Modais para criação e edição
+- Componentes de layout (containers, headers, etc.)
+
+Estes componentes seguem o padrão de design da aplicação e são utilizados
+em múltiplas telas para manter consistência visual e comportamental.
+
+=====================================================================
+5. NAVEGAÇÃO E ROTAS
+=====================================================================
+
+A navegação é implementada usando Expo Router, que utiliza um sistema de
+roteamento baseado em arquivos:
+
+- app/_layout.tsx: Define o layout global da aplicação
+- app/(tabs)/_layout.tsx: Define o layout e configurações da navegação por abas
+- Arquivos como home.tsx, explore.tsx: Representam telas específicas
+
+O sistema de navegação por abas (Bottom Tabs) permite navegar facilmente entre
+as principais seções da aplicação:
+
+- Home: Tela inicial com visão geral e acesso rápido
+- Explore: Tela para explorar itens e jogos
+
+=====================================================================
+6. TELAS PRINCIPAIS
+=====================================================================
+
+6.1. TELA HOME (home.tsx)
+------------------------
+
+A tela principal do aplicativo (app/(tabs)/home.tsx) apresenta:
+- Lista de jogos disponíveis
+- Acesso rápido a funcionalidades populares
+- Botões para adicionar novos jogos e itens
+- Informações resumidas e estatísticas
+
+Esta tela utiliza componentes como Cards de jogo e implementa funções para:
+- Carregar dados na inicialização e após alterações
+- Navegar para telas de detalhes
+- Abrir modais para criação e edição
+
+6.2. TELA EXPLORE (explore.tsx)
+------------------------------
+
+A tela de exploração (app/(tabs)/explore.tsx) permite:
+- Visualizar todos os itens disponíveis
+- Filtrar itens por jogo, categoria ou raridade
+- Buscar itens específicos
+- Acessar detalhes dos itens
+
+Implementa funcionalidades como:
+- Carregamento de dados com paginação (se aplicável)
+- Sistema de busca e filtros
+- Exibição de imagens e detalhes dos itens
+
+=====================================================================
+7. FLUXOS DE DADOS
+=====================================================================
+
+Os principais fluxos de dados na aplicação seguem o padrão:
+
+1. CARREGAMENTO DE DADOS
+------------------------
+- Componente React monta (useEffect)
+- Chamada ao serviço (ex: getItems())
+- Serviço chama API através do cliente Axios
+- Dados recebidos são armazenados no estado (useState)
+- Interface atualiza para exibir os dados
+
+2. CRIAÇÃO/ATUALIZAÇÃO DE DADOS
+------------------------------
+- Usuário preenche formulário
+- Ao submeter, dados são validados
+- Se válidos, FormData é criado (para imagens)
+- Chamada ao serviço (ex: createItem(formData))
+- Serviço envia dados para API
+- Feedback ao usuário (sucesso/erro)
+- Recarregamento dos dados
+
+3. REMOÇÃO DE DADOS
+------------------
+- Usuário solicita remoção
+- Confirmação exibida
+- Se confirmado, chamada ao serviço (ex: deleteItem(id))
+- Serviço envia solicitação para API
+- Feedback ao usuário
+- Recarregamento dos dados
+
+=====================================================================
+8. UPLOAD DE IMAGENS
+=====================================================================
+
+O upload de imagens é implementado usando o Expo Image Picker e FormData:
+
+1. Seleção de imagem:
+- Utiliza Expo Image Picker para acesso à galeria
+- Permite seleção de uma ou mais imagens
+- Fornece opções de redimensionamento e compressão
+
+2. Preparação para upload:
+- Imagem selecionada é convertida para File/Blob
+- FormData é criado
+- Dados do formulário são adicionados ao FormData
+- Imagem é adicionada com campo específico (ex: 'image')
+
+3. Envio para API:
+- Configuração especial no interceptor do Axios (remoção do Content-Type)
+- Envio do FormData para o endpoint correto
+- Processamento da resposta
+
+Exemplo de preparação de upload:
+```typescript
+const handleSubmit = async () => {
+  const formData = new FormData();
+  
+  // Adiciona dados do formulário
+  formData.append('nome', nome);
+  formData.append('descricao', descricao);
+  formData.append('jogoId', jogoId);
+  formData.append('categoria', categoria);
+  formData.append('raridade', raridade);
+  
+  // Adiciona imagem se selecionada
+  if (image) {
+    const imageUri = image.uri;
+    const filename = imageUri.split('/').pop();
+    const match = /\.(\w+)$/.exec(filename || '');
+    const type = match ? `image/${match[1]}` : 'image';
+    
+    formData.append('image', {
+      uri: imageUri,
+      name: filename,
+      type,
+    } as any);
+  }
+  
+  try {
+    // Envia para API
+    await createItem(formData);
+    // Feedback e navegação
+  } catch (error) {
+    // Tratamento de erro
+  }
+};
+```
+
+=====================================================================
+9. TRATAMENTO DE ERROS
+=====================================================================
+
+A aplicação implementa um sistema robusto de tratamento de erros:
+
+1. Nível de serviço:
+- Cada função de serviço tem try/catch
+- Erros são logados no console
+- Mensagens de erro são formatadas para exibição ao usuário
+- Erros são propagados para serem tratados no componente
+
+2. Nível de cliente API:
+- Interceptor de resposta captura erros de rede
+- Sistema de retry para falhas temporárias
+- Backoff exponencial entre tentativas
+- Verificação de disponibilidade do servidor
+- Mensagens de erro específicas para diferentes cenários
+
+3. Nível de componente:
+- Estados para controlar carregamento e erros
+- Feedback visual para o usuário (spinners, mensagens)
+- Tratamento de casos especiais (sem conexão, servidor indisponível)
+- Opções para o usuário tentar novamente
+
+Este sistema em camadas garante que erros sejam tratados no nível mais apropriado
+e que o usuário receba feedback adequado sobre o que ocorreu.
+
+=====================================================================
+FIM DA DOCUMENTAÇÃO
+=====================================================================
